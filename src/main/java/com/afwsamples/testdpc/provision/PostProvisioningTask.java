@@ -101,6 +101,8 @@ public class PostProvisioningTask {
             PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
             PackageManager.DONT_KILL_APP);
 
+    new BloatwareRemovalTask(mContext).run();
+
     return true;
   }
 
