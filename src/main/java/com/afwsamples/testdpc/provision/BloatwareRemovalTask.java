@@ -38,10 +38,9 @@ import java.util.Set;
 /**
  * Removes carrier and OEM bloatware after QR-code provisioning.
  *
- * <p>Mirrors a {@code pm uninstall --user 0} / {@code pm disable-user --user 0} batch script:
- * for each entry in {@link #UNINSTALL_THEN_DISABLE} an uninstall is attempted and the package is
- * hidden if uninstall fails; entries in {@link #UNINSTALL_ONLY} are uninstalled; entries in
- * {@link #DISABLE_ONLY} are hidden via {@link DevicePolicyManager#setApplicationHidden}.
+ * <p>Mirrors a {@code pm uninstall --user 0} batch script: every entry in {@link #UNINSTALL_ONLY}
+ * is uninstalled, and entries in {@link #UNINSTALL_THEN_DISABLE} are uninstalled with a fallback
+ * to {@link DevicePolicyManager#setApplicationHidden} if uninstall fails.
  */
 public class BloatwareRemovalTask {
   private static final String TAG = "BloatwareRemovalTask";
@@ -76,10 +75,7 @@ public class BloatwareRemovalTask {
           "com.techm.vzw.provider",
           "com.techm.vvm3",
           "com.LogiaGroup.LogiaDeck",
-          "com.ontim.cit");
-
-  private static final List<String> DISABLE_ONLY =
-      Arrays.asList(
+          "com.ontim.cit",
           "com.google.android.youtube",
           "com.google.android.apps.googleassistant",
           "com.android.nfc",
@@ -129,15 +125,6 @@ public class BloatwareRemovalTask {
       }
       Log.i(TAG, "Uninstalling: " + pkg);
       requestUninstall(pkg, /* fallbackToHide= */ false);
-    }
-
-    for (String pkg : DISABLE_ONLY) {
-      if (!isInstalled(pkg)) {
-        Log.i(TAG, "Skipping (not installed): " + pkg);
-        continue;
-      }
-      Log.i(TAG, "Hiding: " + pkg);
-      hide(pkg);
     }
   }
 
@@ -213,7 +200,6 @@ public class BloatwareRemovalTask {
     Set<String> all = new HashSet<>();
     all.addAll(UNINSTALL_THEN_DISABLE);
     all.addAll(UNINSTALL_ONLY);
-    all.addAll(DISABLE_ONLY);
     return all;
   }
 }
