@@ -25,7 +25,6 @@ import com.afwsamples.testdpc.common.Util;
 import com.afwsamples.testdpc.comp.BindDeviceAdminServiceHelper;
 import com.afwsamples.testdpc.comp.DeviceOwnerService;
 import com.afwsamples.testdpc.comp.IDeviceOwnerService;
-import com.afwsamples.testdpc.provision.BlasterLeagueInstallTask;
 
 public class BootReceiver extends BroadcastReceiver {
 
@@ -33,7 +32,6 @@ public class BootReceiver extends BroadcastReceiver {
   public void onReceive(Context context, Intent intent) {
     final String action = intent.getAction();
     if (Intent.ACTION_BOOT_COMPLETED.equals(action)) {
-      maybeUpdateBlasterLeague(context);
       if (!Util.isProfileOwner(context)
           || Util.getBindDeviceAdminTargetUsers(context).size() == 0) {
         return;
@@ -51,12 +49,5 @@ public class BootReceiver extends BroadcastReceiver {
       Context context, UserHandle targetUserHandle) {
     return new BindDeviceAdminServiceHelper<>(
         context, DeviceOwnerService.class, IDeviceOwnerService.Stub::asInterface, targetUserHandle);
-  }
-
-  private void maybeUpdateBlasterLeague(Context context) {
-    if (!Util.isDeviceOwner(context) && !Util.isProfileOwner(context)) {
-      return;
-    }
-    new BlasterLeagueInstallTask(context).run();
   }
 }

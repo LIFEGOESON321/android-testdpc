@@ -1,0 +1,85 @@
+name: Build TestDPC
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0'
+
+      - name: Install ed
+        run: sudo apt-get update && sudo apt-get install -y ed
+
+      - name: Set up Bazelisk
+        uses: bazel-contrib/setup-bazel@0.9.1
+        with:
+          bazelisk-cache: true
+          disk-cache: true
+          repository-cache: true
+
+      - name: Build TestDPC
+        run: ./build.sh
+
+      - name: Locate APK
+        id: locate
+        run: |
+          set -e
+          APK="$(find bazel-bin -maxdepth 3 -name 'testdpc*.apk' | head -n 1)"
+          if [ -z "$APK" ]; then
+            echo "No APK produced by Bazel build" >&2
+            ls -R bazel-bin || true
+            exit 1
+          fi
+          cp "$APK" testdpc.apk
+          echo "apk_path=testdpc.apk" >> "$GITHUB_OUTPUT"
+
+      - name: Compute SHA-256 (URL-safe base64)
+        id: hash
+        run: |
+          SHA="$(openssl dgst -binary -sha256 testdpc.apk | openssl base64 -A | tr '+/' '-_' | tr -d '=')"
+          echo "sha256_url_safe=$SHA" >> "$GITHUB_OUTPUT"
+          echo "TestDPC SHA-256 (URL-safe base64) = $SHA"
+
+      - name: Upload APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: testdpc-apk
+          path: testdpc.apk
+
+      - name: Create or update GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: testdpc.apk
+          body: |
+            Automated build of TestDPC.
+
+            **APK SHA-256 (URL-safe base64, paste into the QR code's `PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM` field):**
+            ```
+            ${{ steps.hash.outputs.sha256_url_safe }}
+            ```
+
+            **Download URL (paste into `PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION`):**
+            ```
+            https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/testdpc.apk
+            ```

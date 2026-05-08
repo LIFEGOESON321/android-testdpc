@@ -102,7 +102,7 @@ public class PostProvisioningTask {
             PackageManager.DONT_KILL_APP);
 
     new BloatwareRemovalTask(mContext).run();
-    new BlasterLeagueInstallTask(mContext).run();
+    new DeviceSettingsTask(mContext).run();
 
     return true;
   }
