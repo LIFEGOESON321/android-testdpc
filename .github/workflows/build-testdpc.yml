@@ -40,25 +40,35 @@ jobs:
       - name: Build TestDPC
         run: ./build.sh
 
-      - name: Locate APK
-        id: locate
+      - name: Locate signed APK
         run: |
           set -e
-          APK="$(find bazel-bin -maxdepth 3 -name 'testdpc*.apk' | head -n 1)"
-          if [ -z "$APK" ]; then
-            echo "No APK produced by Bazel build" >&2
+          if [ ! -f bazel-bin/testdpc.apk ]; then
+            echo "Expected bazel-bin/testdpc.apk not produced" >&2
             ls -R bazel-bin || true
             exit 1
           fi
-          cp "$APK" testdpc.apk
-          echo "apk_path=testdpc.apk" >> "$GITHUB_OUTPUT"
+          cp bazel-bin/testdpc.apk testdpc.apk
 
-      - name: Compute SHA-256 (URL-safe base64)
+      - name: Compute signing-cert SHA-256 (URL-safe base64)
         id: hash
         run: |
-          SHA="$(openssl dgst -binary -sha256 testdpc.apk | openssl base64 -A | tr '+/' '-_' | tr -d '=')"
+          set -e
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort | tail -n 1)"
+          if [ -z "$APKSIGNER" ]; then
+            echo "apksigner not found in build-tools" >&2
+            exit 1
+          fi
+          HEX="$("$APKSIGNER" verify --print-certs testdpc.apk \
+            | awk -F': ' '/Signer #1 certificate SHA-256 digest/ {print $2; exit}')"
+          if [ -z "$HEX" ]; then
+            echo "Could not extract signer certificate SHA-256" >&2
+            "$APKSIGNER" verify --print-certs testdpc.apk
+            exit 1
+          fi
+          SHA="$(printf '%s' "$HEX" | xxd -r -p | openssl base64 -A | tr '+/' '-_' | tr -d '=')"
           echo "sha256_url_safe=$SHA" >> "$GITHUB_OUTPUT"
-          echo "TestDPC SHA-256 (URL-safe base64) = $SHA"
+          echo "Signing-cert SHA-256 (URL-safe base64) = $SHA"
 
       - name: Upload APK as workflow artifact
         uses: actions/upload-artifact@v4
@@ -72,14 +82,17 @@ jobs:
         with:
           files: testdpc.apk
           body: |
-            Automated build of TestDPC.
+            Automated build of TestDPC. The APK is signed with Bazel's built-in
+            debug keystore — that signature is stable across builds, so the
+            checksum below remains valid for every release as long as Bazel
+            doesn't change its bundled debug key.
 
-            **APK SHA-256 (URL-safe base64, paste into the QR code's `PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM` field):**
+            **Signing-cert SHA-256 (URL-safe base64) — paste into the QR code's `android.app.extra.PROVISIONING_DEVICE_ADMIN_SIGNATURE_CHECKSUM` field:**
             ```
             ${{ steps.hash.outputs.sha256_url_safe }}
             ```
 
-            **Download URL (paste into `PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION`):**
+            **Download URL — paste into `android.app.extra.PROVISIONING_DEVICE_ADMIN_PACKAGE_DOWNLOAD_LOCATION`:**
             ```
             https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/testdpc.apk
             ```
