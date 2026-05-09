@@ -60,7 +60,7 @@ jobs:
             exit 1
           fi
           HEX="$("$APKSIGNER" verify --print-certs testdpc.apk \
-            | awk -F': ' '/Signer #1 certificate SHA-256 digest/ {print $2; exit}')"
+            | awk -F': *' '/certificate SHA-256 digest/ {print $NF; exit}')"
           if [ -z "$HEX" ]; then
             echo "Could not extract signer certificate SHA-256" >&2
             "$APKSIGNER" verify --print-certs testdpc.apk
